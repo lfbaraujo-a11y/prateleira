@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prateleira.gg</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d1117; color: #f0f4ff; min-height: 100vh; }
+
+.nav { background: #1a2236; border-bottom: 1px solid #2e3a55; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; height: 52px; position: sticky; top: 0; z-index: 10; }
+.nav-logo { font-size: 20px; font-weight: 700; color: #22c55e; letter-spacing: -0.5px; cursor: pointer; }
+.nav-logo span { color: #f0f4ff; }
+
+.page { display: none; padding: 20px; max-width: 800px; margin: 0 auto; }
+.page.active { display: block; }
+
+/* HOME */
+.hero { text-align: center; padding: 40px 20px 28px; }
+.hero h1 { font-size: 28px; font-weight: 700; line-height: 1.2; }
+.hero h1 span { color: #22c55e; }
+.hero p { font-size: 14px; color: #c5cce0; margin-top: 10px; }
+
+.section-label { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #c5cce0; margin-bottom: 10px; }
+.lists-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 28px; }
+.list-card { background: #1a2236; border: 1px solid #2e3a55; border-radius: 10px; padding: 16px; cursor: pointer; transition: border-color 0.2s, background 0.2s; }
+.list-card:hover { border-color: #22c55e; background: #1f2a42; }
+.list-card-tag { font-size: 10px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; padding: 2px 8px; border-radius: 3px; margin-bottom: 8px; display: inline-block; background: rgba(34,197,94,0.2); color: #22c55e; }
+.list-card-title { font-size: 15px; font-weight: 500; color: #f0f4ff; margin-bottom: 4px; }
+.list-card-meta { font-size: 12px; color: #9aa3b8; }
+.list-card-votes { font-size: 12px; color: #22c55e; margin-top: 6px; font-weight: 600; }
+
+.loading { text-align: center; padding: 40px; color: #9aa3b8; }
+
+/* VOTE */
+.back-btn { display: inline-flex; align-items: center; gap: 6px; background: #1a2236; border: 1px solid #2e3a55; color: #f0f4ff; font-size: 13px; font-weight: 500; cursor: pointer; padding: 8px 16px; border-radius: 6px; margin-bottom: 16px; }
+.vote-title { font-size: 20px; font-weight: 700; color: #f0f4ff; }
+.vote-sub { font-size: 13px; color: #c5cce0; margin-top: 4px; margin-bottom: 16px; }
+
+.mode-bar { display: flex; gap: 5px; margin-bottom: 12px; background: #1a2236; border: 1px solid #2e3a55; border-radius: 8px; padding: 4px; }
+.mode-btn { flex: 1; padding: 8px; border-radius: 6px; border: none; background: transparent; color: #c5cce0; font-size: 13px; font-weight: 500; cursor: pointer; font-family: inherit; }
+.mode-btn.active { background: rgba(34,197,94,0.18); color: #22c55e; font-weight: 700; }
+
+.shelf-row { margin-bottom: 6px; }
+.shelf-wrapper { display: flex; border-radius: 8px; overflow: hidden; border: 1px solid #2e3a55; }
+.shelf-label-block { width: 72px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 11px; font-weight: 700; line-height: 1.2; padding: 8px 4px; }
+.label-s { background: #22c55e; color: #fff; }
+.label-a { background: #84cc16; color: #fff; }
+.label-b { background: #eab308; color: #111; }
+.label-c { background: #f97316; color: #fff; }
+.label-chao { background: #ef4444; color: #fff; }
+.shelf-zone { flex: 1; min-height: 80px; padding: 8px; display: flex; flex-wrap: wrap; gap: 6px; align-content: flex-start; transition: background 0.2s; }
+.sz-s { background: rgba(34,197,94,0.07); }
+.sz-a { background: rgba(132,204,22,0.07); }
+.sz-b { background: rgba(234,179,8,0.07); }
+.sz-c { background: rgba(249,115,22,0.07); }
+.sz-chao { background: rgba(239,68,68,0.05); }
+.shelf-zone.drag-over { background: rgba(255,255,255,0.12) !important; }
+.shelf-count { font-size: 11px; color: #c5cce0; font-weight: 500; padding: 4px 10px; flex-shrink: 0; display: flex; align-items: center; }
+
+.player-card { background: #1f2a42; border: 1px solid #2e3a55; border-radius: 6px; padding: 6px 8px; display: flex; align-items: center; gap: 6px; cursor: grab; user-select: none; width: 130px; transition: background 0.15s; }
+.player-card:hover { background: #243352; }
+.player-card.dragging { opacity: 0.35; cursor: grabbing; }
+.player-card.locked { opacity: 0.3; cursor: pointer; border-style: dashed; }
+.player-card.locked:hover { opacity: 0.5; border-color: #eab308; }
+.player-photo { width: 30px; height: 30px; border-radius: 50%; background: #2e3a55; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+.player-info { min-width: 0; }
+.player-name { font-size: 11px; font-weight: 500; color: #f0f4ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.player-pos { font-size: 9px; color: #9aa3b8; }
+
+.mode-hint { font-size: 11px; color: #eab308; margin-bottom: 12px; display: none; }
+
+.vote-actions { margin-top: 16px; display: flex; gap: 10px; }
+.btn-cancel { padding: 12px 24px; background: #1a2236; border: 1px solid #2e3a55; color: #f0f4ff; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; }
+.btn-confirm { flex: 1; padding: 12px; background: #22c55e; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 700; cursor: pointer; }
+.btn-confirm:hover { background: #16a34a; }
+
+/* QUESTIONS */
+.questions-wrap { padding: 40px 20px; text-align: center; max-width: 500px; margin: 0 auto; }
+.questions-wrap h3 { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
+.questions-wrap > p { font-size: 14px; color: #c5cce0; margin-bottom: 32px; }
+.q-block { margin-bottom: 24px; text-align: left; }
+.q-label { font-size: 14px; font-weight: 600; color: #f0f4ff; margin-bottom: 10px; }
+.q-select { width: 100%; padding: 10px 14px; background: #1a2236; border: 1px solid #2e3a55; border-radius: 6px; color: #f0f4ff; font-size: 14px; outline: none; cursor: pointer; }
+.q-options { display: flex; gap: 8px; flex-wrap: wrap; }
+.q-opt { padding: 9px 18px; background: #1a2236; border: 1px solid #2e3a55; border-radius: 6px; font-size: 13px; color: #f0f4ff; cursor: pointer; transition: all 0.15s; }
+.q-opt:hover { border-color: #22c55e; color: #22c55e; }
+.q-opt.selected { background: rgba(34,197,94,0.15); border-color: #22c55e; color: #22c55e; font-weight: 600; }
+.btn-ver { margin-top: 32px; padding: 14px 48px; background: #22c55e; color: #fff; border: none; border-radius: 8px; font-size: 16px; font-weight: 700; cursor: pointer; }
+.btn-ver:disabled { background: #1a2236; color: #4a5568; cursor: not-allowed; border: 1px solid #2e3a55; }
+
+/* STATS */
+.tabs { display: flex; gap: 5px; margin-bottom: 14px; background: #1a2236; border-radius: 8px; padding: 4px; border: 1px solid #2e3a55; }
+.tab { flex: 1; padding: 9px; border-radius: 6px; border: none; background: transparent; color: #f0f4ff; font-size: 13px; font-weight: 500; cursor: pointer; font-family: inherit; }
+.tab.active { background: rgba(34,197,94,0.18); color: #22c55e; font-weight: 700; }
+.tab-section { display: none; }
+.tab-section.active { display: block; }
+
+.s-row { display: flex; align-items: center; gap: 8px; padding: 9px 12px; background: #1a2236; border: 1px solid #2e3a55; border-radius: 8px; margin-bottom: 5px; }
+.s-rank { font-size: 12px; color: #9aa3b8; width: 20px; text-align: center; font-weight: 500; }
+.s-rank.gold { color: #eab308; font-weight: 700; }
+.s-photo { width: 32px; height: 32px; border-radius: 50%; background: #2e3a55; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+.s-info { flex: 1; min-width: 0; }
+.s-name { font-size: 13px; color: #f0f4ff; font-weight: 500; }
+.s-badge { display: inline-block; font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 3px; margin-top: 2px; }
+.b-s { background: rgba(34,197,94,0.2); color: #22c55e; }
+.b-a { background: rgba(132,204,22,0.2); color: #84cc16; }
+.b-b { background: rgba(234,179,8,0.2); color: #eab308; }
+.b-c { background: rgba(249,115,22,0.2); color: #f97316; }
+.b-chao { background: rgba(239,68,68,0.2); color: #ef4444; }
+.s-bar-wrap { width: 80px; height: 5px; background: #2e3a55; border-radius: 3px; overflow: hidden; }
+.s-bar { height: 100%; background: #22c55e; border-radius: 3px; transition: width 0.8s ease; }
+.s-score { font-size: 13px; font-weight: 700; color: #22c55e; width: 28px; text-align: right; }
+
+.metrics-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 16px; }
+.mc { background: #1a2236; border: 1px solid #2e3a55; border-radius: 8px; padding: 14px; text-align: center; }
+.mc-val { font-size: 22px; font-weight: 700; color: #22c55e; }
+.mc-lbl { font-size: 12px; color: #c5cce0; margin-top: 3px; }
+
+.share-section { margin-top: 20px; border-top: 1px solid #2e3a55; padding-top: 20px; }
+.share-section p { font-size: 13px; color: #c5cce0; margin-bottom: 12px; text-align: center; }
+.btn-whatsapp { width: 100%; padding: 13px; background: #25D366; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.btn-whatsapp:hover { background: #1da851; }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-logo" onclick="goTo('home')">prateleira<span>.gg</span></div>
+</nav>
+
+<div id="page-home" class="page active">
+  <div class="hero">
+    <h1>Monte sua <span>prateleira</span><br>e compare com o Brasil</h1>
+    <p>Os debates históricos que nunca têm fim — agora com dados</p>
+  </div>
+  <div id="lists-container"><div class="loading">Carregando votações...</div></div>
+</div>
+
+<div id="page-vote" class="page">
+  <button class="back-btn" onclick="goTo('home')">← Voltar</button>
+  <div class="vote-title" id="vote-title">—</div>
+  <div class="vote-sub" id="vote-sub">Arraste os jogadores para as prateleiras</div>
+  <div class="mode-hint" id="mode-hint">💡 Toque em um jogador apagado para trocá-lo</div>
+  <div class="mode-bar">
+    <button class="mode-btn active" id="mode-all" onclick="setMode('all')">Todos</button>
+    <button class="mode-btn" id="mode-10" onclick="setMode(10)">Top 10</button>
+    <button class="mode-btn" id="mode-5" onclick="setMode(5)">Top 5</button>
+  </div>
+  <div id="vote-shelves"></div>
+  <div class="vote-actions">
+    <button class="btn-cancel" onclick="goTo('home')">Cancelar</button>
+    <button class="btn-confirm" onclick="goTo('questions')">Ver resultado →</button>
+  </div>
+</div>
+
+<div id="page-questions" class="page">
+  <div class="questions-wrap">
+    <h3>Quase lá!</h3>
+    <p>Duas perguntas rápidas antes de ver como o Brasil votou</p>
+    <div class="q-block">
+      <div class="q-label">Qual seu time do coração?</div>
+      <select class="q-select" id="select-time" onchange="selectTime(this)">
+        <option value="" disabled selected>Selecione seu clube...</option>
+        <option>Flamengo</option><option>Corinthians</option><option>Palmeiras</option>
+        <option>São Paulo</option><option>Vasco</option><option>Fluminense</option>
+        <option>Botafogo</option><option>Santos</option><option>Grêmio</option>
+        <option>Internacional</option><option>Atlético Mineiro</option><option>Cruzeiro</option>
+        <option>Athletico Paranaense</option><option>Bahia</option><option>Fortaleza</option>
+        <option>Ceará</option><option>Outro</option>
+      </select>
+    </div>
+    <div class="q-block">
+      <div class="q-label">Qual sua faixa etária?</div>
+      <div class="q-options">
+        <div class="q-opt" onclick="selectOpt(this,'idade')">Até 18</div>
+        <div class="q-opt" onclick="selectOpt(this,'idade')">18–24</div>
+        <div class="q-opt" onclick="selectOpt(this,'idade')">25–34</div>
+        <div class="q-opt" onclick="selectOpt(this,'idade')">35–44</div>
+        <div class="q-opt" onclick="selectOpt(this,'idade')">45+</div>
+      </div>
+    </div>
+    <button class="btn-ver" id="btn-ver" onclick="submitVote()" disabled>Ver como o Brasil votou</button>
+  </div>
+</div>
+
+<div id="page-stats" class="page">
+  <button class="back-btn" onclick="goTo('home')">← Início</button>
+  <div class="vote-title" id="stats-title">—</div>
+  <div class="vote-sub" id="stats-sub" style="margin-bottom:16px;">—</div>
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('ranking')">Ranking</button>
+    <button class="tab" onclick="switchTab('sua')">Sua votação</button>
+  </div>
+  <div id="tab-ranking" class="tab-section active"></div>
+  <div id="tab-sua" class="tab-section"></div>
+  <div class="share-section">
+    <p>Mostre sua prateleira para os amigos!</p>
+    <button class="btn-whatsapp" onclick="compartilhar()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+      Compartilhar no WhatsApp
+    </button>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://narrbblibqwngukmbksv.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_ul3HI8xdCkoOKGZuFqvksg_xUbgbcL2';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const shelvesDef = [
+  { key:'s',    label:'ELITE MUNDIAL' },
+  { key:'a',    label:'TOP'           },
+  { key:'b',    label:'SÓLIDO'        },
+  { key:'c',    label:'PARTICIPOU'    },
+  { key:'chao', label:'NO CHÃO'       },
+];
+const shelfNames = { s:'Elite', a:'Top', b:'Sólido', c:'Participou', chao:'No Chão' };
+const POINTS = { s:4, a:3, b:2, c:1, chao:0 };
+
+let currentList = null;
+let currentPlayers = [];
+let shuffledPlayers = [];
+let currentMode = 'all';
+let draggingId = null;
+let userVotes = {};
+let answers = { time: null, idade: null };
+let currentVotacaoId = null;
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length-1; i>0; i--) {
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]] = [a[j],a[i]];
+  }
+  return a;
+}
+
+async function loadLists() {
+  const { data: listas } = await sb.from('listas').select('*').eq('ativa', true);
+  const { data: counts } = await sb.from('votacoes').select('lista_id');
+
+  const countMap = {};
+  if (counts) counts.forEach(v => { countMap[v.lista_id] = (countMap[v.lista_id]||0)+1; });
+
+  const container = document.getElementById('lists-container');
+  container.innerHTML = '';
+
+  const label = document.createElement('div');
+  label.className = 'section-label';
+  label.textContent = '🔥 Votações disponíveis';
+  container.appendChild(label);
+
+  const grid = document.createElement('div');
+  grid.className = 'lists-grid';
+
+  listas.forEach(lista => {
+    const card = document.createElement('div');
+    card.className = 'list-card';
+    card.innerHTML = `
+      <span class="list-card-tag">${lista.tag || lista.categoria}</span>
+      <div class="list-card-title">${lista.titulo}</div>
+      <div class="list-card-meta">${lista.descricao ? lista.descricao.substring(0,60)+'...' : ''}</div>
+      <div class="list-card-votes">${(countMap[lista.id]||0).toLocaleString('pt-BR')} votações</div>`;
+    card.onclick = () => loadVote(lista);
+    grid.appendChild(card);
+  });
+
+  container.appendChild(grid);
+}
+
+async function loadVote(lista) {
+  currentList = lista;
+  userVotes = {};
+  answers = { time: null, idade: null };
+  document.getElementById('btn-ver').disabled = true;
+  document.getElementById('select-time').value = '';
+
+  const { data: lj } = await sb
+    .from('lista_jogadores')
+    .select('jogador_id, ordem_editorial, jogadores(id, nome)')
+    .eq('lista_id', lista.id)
+    .order('ordem_editorial');
+
+  currentPlayers = lj.map(r => ({ id: r.jogador_id, nome: r.jogadores.nome, ordem: r.ordem_editorial }));
+  shuffledPlayers = shuffle(currentPlayers);
+
+  document.getElementById('vote-title').textContent = lista.titulo;
+  currentMode = 'all';
+  ['all','10','5'].forEach(m => document.getElementById('mode-'+m)?.classList.toggle('active', m==='all'));
+
+  buildShelves();
+  goTo('vote');
+}
+
+function getLimit() { return currentMode === 'all' ? 5 : currentMode === 10 ? 2 : 1; }
+
+function buildShelves() {
+  const wrap = document.getElementById('vote-shelves');
+  wrap.innerHTML = '';
+  document.getElementById('vote-sub').textContent = `Arraste os jogadores para as prateleiras · ${getLimit()} por prateleira · ${getLimit()} no chão`;
+  document.getElementById('mode-hint').style.display = 'none';
+
+  shelvesDef.forEach(s => {
+    const row = document.createElement('div'); row.className = 'shelf-row';
+    const wrapper = document.createElement('div'); wrapper.className = 'shelf-wrapper';
+    const lbl = document.createElement('div');
+    lbl.className = `shelf-label-block label-${s.key}`; lbl.textContent = s.label;
+    const zone = document.createElement('div');
+    zone.id = `vzone-${s.key}`; zone.className = `shelf-zone sz-${s.key}`;
+    const cnt = document.createElement('div');
+    cnt.className = 'shelf-count'; cnt.id = `vcnt-${s.key}`;
+    cnt.textContent = s.key === 'chao' ? shuffledPlayers.length : `0/${getLimit()}`;
+
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+    zone.addEventListener('drop', e => {
+      e.preventDefault(); zone.classList.remove('drag-over');
+      if (!draggingId) return;
+      const card = document.querySelector(`[data-pid="${draggingId}"]`);
+      if (!card || card.classList.contains('locked')) return;
+      const lim = getLimit();
+      if (s.key !== 'chao' && zone.children.length >= lim) {
+        const last = zone.children[zone.children.length-1];
+        document.getElementById('vzone-chao').appendChild(last);
+      }
+      zone.appendChild(card);
+      updateCounts();
+    });
+
+    wrapper.appendChild(lbl); wrapper.appendChild(zone); wrapper.appendChild(cnt);
+    row.appendChild(wrapper); wrap.appendChild(row);
+  });
+
+  const chao = document.getElementById('vzone-chao');
+  shuffledPlayers.forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'player-card'; card.draggable = true; card.dataset.pid = p.id;
+    const photo = document.createElement('div'); photo.className = 'player-photo'; photo.textContent = '⚽';
+    const info = document.createElement('div'); info.className = 'player-info';
+    info.innerHTML = `<div class="player-name">${p.nome}</div>`;
+    card.appendChild(photo); card.appendChild(info);
+    card.addEventListener('dragstart', () => {
+      if (card.classList.contains('locked')) return;
+      draggingId = p.id; setTimeout(()=>card.classList.add('dragging'),0);
+    });
+    card.addEventListener('dragend', () => { card.classList.remove('dragging'); draggingId = null; });
+    card.addEventListener('click', () => {
+      if (card.classList.contains('locked') && card.closest('#vzone-chao')) toggleLock(p.id);
+    });
+    chao.appendChild(card);
+  });
+  updateCounts();
+}
+
+function setMode(mode) {
+  currentMode = mode;
+  ['all',10,5].forEach(m => document.getElementById('mode-'+m)?.classList.toggle('active', m===mode));
+  const lim = getLimit();
+  document.getElementById('vote-sub').textContent = `Arraste os jogadores · ${lim} por prateleira · ${lim} no chão`;
+  document.getElementById('mode-hint').style.display = mode==='all' ? 'none' : 'block';
+
+  const chao = document.getElementById('vzone-chao');
+  chao.querySelectorAll('.player-card.locked').forEach(c => chao.appendChild(c));
+
+  if (mode === 'all') {
+    document.querySelectorAll('.player-card').forEach(c => { c.classList.remove('locked'); c.draggable = true; });
+  } else {
+    const topIds = currentPlayers.slice(0, mode).map(p => p.id);
+    document.querySelectorAll('.player-card').forEach(c => {
+      const locked = !topIds.includes(parseInt(c.dataset.pid));
+      c.classList.toggle('locked', locked); c.draggable = !locked;
+    });
+  }
+  updateCounts();
+}
+
+function toggleLock(clickedId) {
+  const clicked = document.querySelector(`[data-pid="${clickedId}"]`);
+  if (!clicked?.classList.contains('locked')) return;
+  const chao = document.getElementById('vzone-chao');
+  const unlocked = Array.from(chao.querySelectorAll('.player-card:not(.locked)'));
+  if (!unlocked.length) return;
+  const last = unlocked[unlocked.length-1];
+  clicked.classList.remove('locked'); clicked.draggable = true;
+  if (last.closest('#vzone-chao')) { last.classList.add('locked'); last.draggable = false; }
+  updateCounts();
+}
+
+function updateCounts() {
+  const lim = getLimit();
+  shelvesDef.forEach(s => {
+    const z = document.getElementById(`vzone-${s.key}`);
+    const c = document.getElementById(`vcnt-${s.key}`);
+    if (!z||!c) return;
+    c.textContent = s.key==='chao' ? z.querySelectorAll('.player-card:not(.locked)').length : `${z.children.length}/${lim}`;
+  });
+}
+
+function collectVotes() {
+  const votes = {};
+  shelvesDef.forEach(s => {
+    const zone = document.getElementById(`vzone-${s.key}`);
+    if (!zone) return;
+    zone.querySelectorAll('.player-card:not(.locked)').forEach(card => {
+      votes[parseInt(card.dataset.pid)] = s.key;
+    });
+  });
+  return votes;
+}
+
+function selectTime(el) {
+  if (!el.value) return;
+  answers.time = el.value;
+  el.style.borderColor = '#22c55e';
+  checkReady();
+}
+
+function selectOpt(el, group) {
+  el.parentElement.querySelectorAll('.q-opt').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  answers[group] = el.textContent;
+  checkReady();
+}
+
+function checkReady() {
+  document.getElementById('btn-ver').disabled = !(answers.time && answers.idade);
+}
+
+async function submitVote() {
+  userVotes = collectVotes();
+  document.getElementById('btn-ver').disabled = true;
+  document.getElementById('btn-ver').textContent = 'Salvando...';
+
+  try {
+    const { data: votacao } = await sb.from('votacoes').insert({
+      lista_id: currentList.id,
+      fingerprint: getFingerprint(),
+      time_do_coracao: answers.time,
+      faixa_etaria: answers.idade,
+      modo: currentMode === 'all' ? 25 : currentMode
+    }).select().single();
+
+    currentVotacaoId = votacao.id;
+
+    const votosArr = Object.entries(userVotes).map(([jogador_id, prateleira]) => ({
+      votacao_id: votacao.id,
+      jogador_id: parseInt(jogador_id),
+      prateleira
+    }));
+
+    await sb.from('votos').insert(votosArr);
+    goTo('stats');
+    buildStats();
+  } catch(e) {
+    document.getElementById('btn-ver').disabled = false;
+    document.getElementById('btn-ver').textContent = 'Ver como o Brasil votou';
+    alert('Erro ao salvar. Tente novamente.');
+  }
+}
+
+function getFingerprint() {
+  let fp = localStorage.getItem('prateleira_fp');
+  if (!fp) { fp = Math.random().toString(36).slice(2)+Date.now().toString(36); localStorage.setItem('prateleira_fp',fp); }
+  return fp;
+}
+
+async function buildStats() {
+  document.getElementById('stats-title').textContent = currentList.titulo;
+
+  const { data: votos } = await sb.from('votos')
+    .select('jogador_id, prateleira, jogadores(nome)')
+    .in('votacao_id', await getVotacaoIds());
+
+  const scoreMap = {};
+  const countMap = {};
+  if (votos) {
+    votos.forEach(v => {
+      if (!scoreMap[v.jogador_id]) { scoreMap[v.jogador_id] = { total:0, count:0, nome: v.jogadores.nome, shelf:{} }; }
+      scoreMap[v.jogador_id].total += POINTS[v.prateleira]||0;
+      scoreMap[v.jogador_id].count++;
+      scoreMap[v.jogador_id].shelf[v.prateleira] = (scoreMap[v.jogador_id].shelf[v.prateleira]||0)+1;
+    });
+  }
+
+  const { count: totalVotos } = await sb.from('votacoes').select('*', {count:'exact',head:true}).eq('lista_id', currentList.id);
+  document.getElementById('stats-sub').textContent = `${totalVotos||0} votações · Score de 0 a 100`;
+
+  buildRanking(scoreMap);
+  buildSuaVotacao(scoreMap, totalVotos||1);
+}
+
+async function getVotacaoIds() {
+  const { data } = await sb.from('votacoes').select('id').eq('lista_id', currentList.id).limit(500);
+  return data ? data.map(v => v.id) : [];
+}
+
+function buildRanking(scoreMap) {
+  const wrap = document.getElementById('tab-ranking');
+  wrap.innerHTML = '';
+
+  const ranked = Object.entries(scoreMap).map(([id, d]) => ({
+    id, nome: d.nome,
+    score: d.count ? Math.round((d.total/d.count/4)*100) : 0,
+    dominant: Object.entries(d.shelf).sort((a,b)=>b[1]-a[1])[0]?.[0] || 'chao'
+  })).sort((a,b)=>b.score-a.score);
+
+  ranked.forEach((p,i) => {
+    const row = document.createElement('div'); row.className = 's-row';
+    const rank = document.createElement('span'); rank.className='s-rank'+(i<3?' gold':''); rank.textContent=i+1;
+    const photo = document.createElement('div'); photo.className='s-photo'; photo.textContent='⚽';
+    const info = document.createElement('div'); info.className='s-info';
+    info.innerHTML=`<div class="s-name">${p.nome}</div><span class="s-badge b-${p.dominant}">${shelfNames[p.dominant]}</span>`;
+    const sw = document.createElement('div'); sw.style.cssText='display:flex;align-items:center;gap:6px;';
+    sw.innerHTML=`<div class="s-bar-wrap"><div class="s-bar" style="width:0" data-w="${p.score}%"></div></div><span class="s-score">${p.score}</span>`;
+    row.appendChild(rank); row.appendChild(photo); row.appendChild(info); row.appendChild(sw);
+    wrap.appendChild(row);
+  });
+
+  if (!ranked.length) wrap.innerHTML = '<div class="loading">Ainda sem votos suficientes para mostrar ranking.</div>';
+  setTimeout(()=>document.querySelectorAll('.s-bar[data-w]').forEach(b=>b.style.width=b.dataset.w), 200);
+}
+
+function buildSuaVotacao(scoreMap, totalVotos) {
+  const wrap = document.getElementById('tab-sua');
+  wrap.innerHTML = '';
+
+  const mg = document.createElement('div'); mg.className='metrics-row';
+  const myCount = Object.keys(userVotes).length;
+  const agree = Object.entries(userVotes).filter(([id, shelf]) => {
+    const d = scoreMap[id];
+    if (!d) return false;
+    const dominant = Object.entries(d.shelf).sort((a,b)=>b[1]-a[1])[0]?.[0];
+    return dominant === shelf;
+  }).length;
+
+  mg.innerHTML=`<div class="mc"><div class="mc-val">${myCount}</div><div class="mc-lbl">jogadores votados</div></div>
+    <div class="mc"><div class="mc-val">${agree}</div><div class="mc-lbl">concordâncias</div></div>
+    <div class="mc"><div class="mc-val">${totalVotos}</div><div class="mc-lbl">total votações</div></div>`;
+  wrap.appendChild(mg);
+
+  const intro = document.createElement('p'); intro.style.cssText='font-size:13px;color:#c5cce0;margin-bottom:12px;';
+  intro.textContent = 'Sua prateleira vs. consenso geral';
+  wrap.appendChild(intro);
+
+  Object.entries(userVotes).forEach(([id, myShelf]) => {
+    const d = scoreMap[id];
+    const nome = d?.nome || currentPlayers.find(p=>p.id==id)?.nome || id;
+    const dominant = d ? Object.entries(d.shelf).sort((a,b)=>b[1]-a[1])[0]?.[0] : null;
+    const agreed = dominant === myShelf;
+
+    const row = document.createElement('div');
+    row.style.cssText=`display:flex;align-items:center;gap:8px;padding:8px 12px;background:#1a2236;border:1px solid #2e3a55;border-left:3px solid ${agreed?'#22c55e':'#f97316'};border-radius:8px;margin-bottom:5px;`;
+    const photo = document.createElement('div'); photo.className='s-photo'; photo.textContent='⚽';
+    const info = document.createElement('div'); info.style.flex='1';
+    if (!dominant) {
+      info.innerHTML=`<div class="s-name">${nome}</div><div style="font-size:11px;color:#9aa3b8;">Você: <span class="s-badge b-${myShelf}">${shelfNames[myShelf]}</span></div>`;
+    } else if (agreed) {
+      info.innerHTML=`<div class="s-name">${nome}</div><div style="font-size:11px;color:#22c55e;">✓ concordou com o Brasil · <span class="s-badge b-${myShelf}">${shelfNames[myShelf]}</span></div>`;
+    } else {
+      info.innerHTML=`<div class="s-name">${nome}</div><div style="font-size:11px;color:#c5cce0;">Você: <span class="s-badge b-${myShelf}">${shelfNames[myShelf]}</span> → BR: <span class="s-badge b-${dominant}">${shelfNames[dominant]}</span></div>`;
+    }
+    row.appendChild(photo); row.appendChild(info);
+    wrap.appendChild(row);
+  });
+
+  if (!Object.keys(userVotes).length) wrap.innerHTML = '<div class="loading">Você não votou em nenhum jogador ainda.</div>';
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',['ranking','sua'][i]===tab));
+  document.querySelectorAll('.tab-section').forEach(s=>s.classList.remove('active'));
+  document.getElementById(`tab-${tab}`).classList.add('active');
+}
+
+function compartilhar() {
+  const msg = encodeURIComponent(`Montei minha prateleira de "${currentList?.titulo}"! Vem montar a sua:\nprateleira.gg`);
+  window.open(`https://wa.me/?text=${msg}`, '_blank');
+}
+
+function goTo(page) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById(`page-${page}`).classList.add('active');
+  window.scrollTo(0,0);
+}
+
+loadLists();
+</script>
+</body>
+</html>
