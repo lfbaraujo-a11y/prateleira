@@ -492,7 +492,7 @@ async function buildStats() {
   document.getElementById('stats-title').textContent = currentList.titulo;
 
   const { data: votos } = await sb.from('votos')
-    .select('jogador_id, prateleira, jogadores(nome)')
+    .select('jogador_id, prateleira, jogadores(nome), votacoes(modo)')
     .in('votacao_id', await getVotacaoIds());
 
   const scoreMap = {};
@@ -500,7 +500,11 @@ async function buildStats() {
   if (votos) {
     votos.forEach(v => {
       if (!scoreMap[v.jogador_id]) { scoreMap[v.jogador_id] = { total:0, count:0, nome: v.jogadores.nome, shelf:{} }; }
-      scoreMap[v.jogador_id].total += POINTS[v.prateleira]||0;
+      // Use mode-aware points: votacao.modo tells us which mode was used
+      const vmode = v.votacoes?.modo || 25;
+      const modePoints = POINTS_BY_MODE[vmode] || POINTS_BY_MODE[25];
+      const pts = modePoints[v.prateleira] || 0;
+      scoreMap[v.jogador_id].total += pts;
       scoreMap[v.jogador_id].count++;
       scoreMap[v.jogador_id].shelf[v.prateleira] = (scoreMap[v.jogador_id].shelf[v.prateleira]||0)+1;
     });
@@ -535,7 +539,7 @@ function buildRanking(scoreMap) {
     const info = document.createElement('div'); info.className='s-info';
     info.innerHTML=`<div class="s-name">${p.nome}</div><span class="s-badge b-${p.dominant}">${shelfNames[p.dominant]}</span>`;
     const sw = document.createElement('div'); sw.style.cssText='display:flex;align-items:center;gap:6px;';
-    sw.innerHTML=`<div class="s-bar-wrap"><div class="s-bar" style="width:0" data-w="${p.score}%"></div></div><span class="s-score">${p.score}</span>`;
+    sw.innerHTML=`<div class="s-bar-wrap"><div class="s-bar" style="width:0" data-w="${p.scoreNorm}%"></div></div><span class="s-score">${p.score}</span>`;
     row.appendChild(rank); row.appendChild(photo); row.appendChild(info); row.appendChild(sw);
     wrap.appendChild(row);
   });
