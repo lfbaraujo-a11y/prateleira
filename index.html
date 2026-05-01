@@ -206,7 +206,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
 <script>
 const SUPABASE_URL = 'https://narrbblibqwngukmbksv.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5hcnJiYmxpYnF3bmd1a21ia3N2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczMTk5MDEsImV4cCI6MjA5Mjg5NTkwMX0.HUfEV3UuLJX1ZgH6rIsIKCh-znpU_GrbLrin2ILyQ_c';
+const SUPABASE_KEY = 'sb_publishable_ul3HI8xdCkoOKGZuFqvksg_xUbgbcL2';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const shelvesDef = [
@@ -217,7 +217,19 @@ const shelvesDef = [
   { key:'chao', label:'NO CHÃO'       },
 ];
 const shelfNames = { s:'Elite', a:'Top', b:'Sólido', c:'Participou', chao:'No Chão' };
-const POINTS = { s:4, a:3, b:2, c:1, chao:0 };
+// Pontuação por modo e prateleira
+const POINTS_BY_MODE = {
+  25: { s:25, a:20, b:15, c:10, chao:5 },
+  10: { s:10, a:8,  b:6,  c:4,  chao:2 },
+  5:  { s:5,  a:4,  b:3,  c:2,  chao:1 },
+};
+// Sugerido pontua igual a C
+function getPoints(mode, shelf) {
+  const m = POINTS_BY_MODE[mode] || POINTS_BY_MODE[25];
+  if (shelf === 'sugerido') return m.c;
+  return m[shelf] || 0;
+}
+const POINTS = { s:25, a:20, b:15, c:10, chao:5 }; // fallback para ranking
 
 let currentList = null;
 let currentPlayers = [];
@@ -577,6 +589,21 @@ function switchTab(tab) {
 function compartilhar() {
   const msg = encodeURIComponent(`Montei minha prateleira de "${currentList?.titulo}"! Vem montar a sua:\nprateleira.gg`);
   window.open(`https://wa.me/?text=${msg}`, '_blank');
+}
+
+async function enviarFeedback() {
+  const texto = document.getElementById('feedback-text').value.trim();
+  if (!texto) return;
+  try {
+    await sb.from('sugestoes').insert({
+      lista_id: currentList?.id || null,
+      nome_sugerido: '[FEEDBACK] ' + texto,
+      contagem: 1
+    });
+  } catch(e) {}
+  document.getElementById('feedback-text').value = '';
+  document.getElementById('feedback-ok').style.display = 'block';
+  setTimeout(() => { document.getElementById('feedback-ok').style.display = 'none'; }, 4000);
 }
 
 function goTo(page) {
