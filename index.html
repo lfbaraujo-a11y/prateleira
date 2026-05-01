@@ -269,27 +269,38 @@ async function loadLists() {
   const container = document.getElementById('lists-container');
   container.innerHTML = '';
 
-  const label = document.createElement('div');
-  label.className = 'section-label';
-  label.textContent = '🔥 Votações disponíveis';
-  container.appendChild(label);
+  // Separar por categoria
+  const hot = listas.filter(l => (countMap[l.id]||0) > 0).sort((a,b) => (countMap[b.id]||0) - (countMap[a.id]||0)).slice(0,4);
+  const gerais = listas.filter(l => l.categoria === 'historia' || l.categoria === 'posicao');
+  const times = listas.filter(l => l.categoria === 'clube');
 
-  const grid = document.createElement('div');
-  grid.className = 'lists-grid';
+  function makeSection(emoji, title, items) {
+    if (!items.length) return;
+    const label = document.createElement('div');
+    label.className = 'section-label';
+    label.textContent = emoji + ' ' + title;
+    container.appendChild(label);
 
-  listas.forEach(lista => {
-    const card = document.createElement('div');
-    card.className = 'list-card';
-    card.innerHTML = `
-      <span class="list-card-tag">${lista.tag || lista.categoria}</span>
-      <div class="list-card-title">${lista.titulo}</div>
-      <div class="list-card-meta">${lista.descricao ? lista.descricao.substring(0,60)+'...' : ''}</div>
-      <div class="list-card-votes">${(countMap[lista.id]||0).toLocaleString('pt-BR')} votações</div>`;
-    card.onclick = () => loadVote(lista);
-    grid.appendChild(card);
-  });
+    const grid = document.createElement('div');
+    grid.className = 'lists-grid';
+    items.forEach(lista => {
+      const card = document.createElement('div');
+      card.className = 'list-card';
+      const votes = countMap[lista.id] || 0;
+      card.innerHTML = `
+        <span class="list-card-tag">${lista.tag || lista.categoria}</span>
+        <div class="list-card-title">${lista.titulo}</div>
+        <div class="list-card-meta">${lista.descricao ? lista.descricao.substring(0,55)+'...' : ''}</div>
+        <div class="list-card-votes">${votes > 0 ? votes.toLocaleString('pt-BR') + ' votações' : 'Seja o primeiro a votar!'}</div>`;
+      card.onclick = () => loadVote(lista);
+      grid.appendChild(card);
+    });
+    container.appendChild(grid);
+  }
 
-  container.appendChild(grid);
+  makeSection('🔥', 'Listas Hot', hot);
+  makeSection('🌍', 'Listas Gerais', gerais);
+  makeSection('🏟️', 'Listas de Times', times);
 }
 
 async function loadVote(lista) {
@@ -422,12 +433,21 @@ function updateCounts() {
 
 function collectVotes() {
   const votes = {};
+  // Collect votes from all shelves including chao
   shelvesDef.forEach(s => {
     const zone = document.getElementById(`vzone-${s.key}`);
     if (!zone) return;
     zone.querySelectorAll('.player-card:not(.locked)').forEach(card => {
       votes[parseInt(card.dataset.pid)] = s.key;
     });
+  });
+  // All active players not yet voted default to chao
+  currentPlayers.forEach(p => {
+    if (currentMode === 'all' || currentList.players?.slice(0, currentMode === 10 ? 10 : 5).some(x => x.id === p.id)) {
+      if (!(p.id in votes)) {
+        votes[p.id] = 'chao';
+      }
+    }
   });
   return votes;
 }
@@ -528,9 +548,13 @@ function buildRanking(scoreMap) {
 
   const ranked = Object.entries(scoreMap).map(([id, d]) => ({
     id, nome: d.nome,
-    score: d.count ? Math.round((d.total/d.count/4)*100) : 0,
+    score: d.total,
+    scoreNorm: 0, // will be set after finding max
     dominant: Object.entries(d.shelf).sort((a,b)=>b[1]-a[1])[0]?.[0] || 'chao'
   })).sort((a,b)=>b.score-a.score);
+
+  const topScore = ranked.length > 0 ? ranked[0].score : 1;
+  ranked.forEach(p => { p.scoreNorm = Math.round((p.score / topScore) * 100); });
 
   ranked.forEach((p,i) => {
     const row = document.createElement('div'); row.className = 's-row';
