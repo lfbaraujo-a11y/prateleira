@@ -7,6 +7,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
+html { touch-action: pan-y; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d1117; color: #f0f4ff; min-height: 100vh; }
 
 .nav { background: #1a2236; border-bottom: 1px solid #2e3a55; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; height: 52px; position: sticky; top: 0; z-index: 10; }
@@ -332,7 +333,7 @@ function getLimit() { return currentMode === 'all' ? 5 : currentMode === 10 ? 2 
 function buildShelves() {
   const wrap = document.getElementById('vote-shelves');
   wrap.innerHTML = '';
-  document.getElementById('vote-sub').textContent = `Arraste os jogadores para as prateleiras · ${getLimit()} por prateleira · ${getLimit()} no chão`;
+  document.getElementById('vote-sub').textContent = `Distribua todos os jogadores nas prateleiras · ${getLimit()} por prateleira`;
   document.getElementById('mode-hint').style.display = 'none';
 
   shelvesDef.forEach(s => {
@@ -374,14 +375,58 @@ function buildShelves() {
     const info = document.createElement('div'); info.className = 'player-info';
     info.innerHTML = `<div class="player-name">${p.nome}</div>`;
     card.appendChild(photo); card.appendChild(info);
+    // Desktop drag
     card.addEventListener('dragstart', () => {
       if (card.classList.contains('locked')) return;
       draggingId = p.id; setTimeout(()=>card.classList.add('dragging'),0);
     });
     card.addEventListener('dragend', () => { card.classList.remove('dragging'); draggingId = null; });
     card.addEventListener('click', () => {
-      if (card.classList.contains('locked') && card.closest('#vzone-chao')) toggleLock(p.id);
+      if (card.classList.contains('locked') && card.closest('#vzone-disponivel')) toggleLock(p.id);
     });
+
+    // Mobile touch drag
+    let touchStartX, touchStartY, touchClone;
+    card.addEventListener('touchstart', e => {
+      if (card.classList.contains('locked')) return;
+      const touch = e.touches[0];
+      touchStartX = touch.clientX; touchStartY = touch.clientY;
+      draggingId = p.id;
+      touchClone = card.cloneNode(true);
+      touchClone.style.cssText = 'position:fixed;z-index:9999;opacity:0.8;pointer-events:none;width:'+card.offsetWidth+'px;';
+      touchClone.style.left = touchStartX - card.offsetWidth/2 + 'px';
+      touchClone.style.top = touchStartY - card.offsetHeight/2 + 'px';
+      document.body.appendChild(touchClone);
+      card.classList.add('dragging');
+    }, {passive:true});
+
+    card.addEventListener('touchmove', e => {
+      if (!touchClone) return;
+      e.preventDefault();
+      const touch = e.touches[0];
+      touchClone.style.left = touch.clientX - touchClone.offsetWidth/2 + 'px';
+      touchClone.style.top = touch.clientY - touchClone.offsetHeight/2 + 'px';
+    }, {passive:false});
+
+    card.addEventListener('touchend', e => {
+      if (!touchClone) return;
+      const touch = e.changedTouches[0];
+      if (touchClone) { document.body.removeChild(touchClone); touchClone = null; }
+      card.classList.remove('dragging');
+      const el = document.elementFromPoint(touch.clientX, touch.clientY);
+      const zone = el?.closest('.shelf-zone');
+      if (zone && draggingId) {
+        const key = zone.id.replace('vzone-','');
+        const lim = getLimit();
+        if (key !== 'chao' && zone.children.length >= lim) {
+          const last = zone.children[zone.children.length-1];
+          document.getElementById('vzone-chao').appendChild(last);
+        }
+        zone.appendChild(card);
+        updateCounts();
+      }
+      draggingId = null;
+    }, {passive:true});
     chao.appendChild(card);
   });
   updateCounts();
@@ -412,12 +457,12 @@ function setMode(mode) {
 function toggleLock(clickedId) {
   const clicked = document.querySelector(`[data-pid="${clickedId}"]`);
   if (!clicked?.classList.contains('locked')) return;
-  const chao = document.getElementById('vzone-chao');
+  const chao = document.getElementById('vzone-disponivel');
   const unlocked = Array.from(chao.querySelectorAll('.player-card:not(.locked)'));
   if (!unlocked.length) return;
   const last = unlocked[unlocked.length-1];
   clicked.classList.remove('locked'); clicked.draggable = true;
-  if (last.closest('#vzone-chao')) { last.classList.add('locked'); last.draggable = false; }
+  if (last.closest('#vzone-disponivel')) { last.classList.add('locked'); last.draggable = false; }
   updateCounts();
 }
 
@@ -441,14 +486,14 @@ function collectVotes() {
       votes[parseInt(card.dataset.pid)] = s.key;
     });
   });
-  // All active players not yet voted default to chao
-  currentPlayers.forEach(p => {
-    if (currentMode === 'all' || currentList.players?.slice(0, currentMode === 10 ? 10 : 5).some(x => x.id === p.id)) {
-      if (!(p.id in votes)) {
-        votes[p.id] = 'chao';
-      }
-    }
-  });
+  // Players left in disponivel zone count as not voted (no points)
+  const dispZone = document.getElementById('vzone-disponivel');
+  if (dispZone) {
+    dispZone.querySelectorAll('.player-card:not(.locked)').forEach(card => {
+      const pid = parseInt(card.dataset.pid);
+      if (!(pid in votes)) votes[pid] = null; // not voted
+    });
+  }
   return votes;
 }
 
