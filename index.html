@@ -357,7 +357,7 @@ function buildShelves() {
       const lim = getLimit();
       if (s.key !== 'chao' && zone.children.length >= lim) {
         const last = zone.children[zone.children.length-1];
-        document.getElementById('vzone-chao').appendChild(last);
+        document.getElementById('vzone-disponivel').appendChild(last);
       }
       zone.appendChild(card);
       updateCounts();
@@ -367,7 +367,7 @@ function buildShelves() {
     row.appendChild(wrapper); wrap.appendChild(row);
   });
 
-  const chao = document.getElementById('vzone-chao');
+  const chao = document.getElementById('vzone-disponivel');
   shuffledPlayers.forEach(p => {
     const card = document.createElement('div');
     card.className = 'player-card'; card.draggable = true; card.dataset.pid = p.id;
@@ -420,7 +420,7 @@ function buildShelves() {
         const lim = getLimit();
         if (key !== 'chao' && zone.children.length >= lim) {
           const last = zone.children[zone.children.length-1];
-          document.getElementById('vzone-chao').appendChild(last);
+          document.getElementById('vzone-disponivel').appendChild(last);
         }
         zone.appendChild(card);
         updateCounts();
@@ -439,7 +439,7 @@ function setMode(mode) {
   document.getElementById('vote-sub').textContent = `Arraste os jogadores · ${lim} por prateleira · ${lim} no chão`;
   document.getElementById('mode-hint').style.display = mode==='all' ? 'none' : 'block';
 
-  const chao = document.getElementById('vzone-chao');
+  const chao = document.getElementById('vzone-disponivel');
   chao.querySelectorAll('.player-card.locked').forEach(c => chao.appendChild(c));
 
   if (mode === 'all') {
