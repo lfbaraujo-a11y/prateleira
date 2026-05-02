@@ -336,6 +336,7 @@ function buildShelves() {
   document.getElementById('vote-sub').textContent = `Distribua todos os jogadores nas prateleiras · ${getLimit()} por prateleira`;
   document.getElementById('mode-hint').style.display = 'none';
 
+  // Criar prateleiras
   shelvesDef.forEach(s => {
     const row = document.createElement('div'); row.className = 'shelf-row';
     const wrapper = document.createElement('div'); wrapper.className = 'shelf-wrapper';
@@ -345,7 +346,7 @@ function buildShelves() {
     zone.id = `vzone-${s.key}`; zone.className = `shelf-zone sz-${s.key}`;
     const cnt = document.createElement('div');
     cnt.className = 'shelf-count'; cnt.id = `vcnt-${s.key}`;
-    cnt.textContent = s.key === 'chao' ? shuffledPlayers.length : `0/${getLimit()}`;
+    cnt.textContent = `0/${getLimit()}`;
 
     zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
     zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
@@ -355,7 +356,7 @@ function buildShelves() {
       const card = document.querySelector(`[data-pid="${draggingId}"]`);
       if (!card || card.classList.contains('locked')) return;
       const lim = getLimit();
-      if (s.key !== 'chao' && zone.children.length >= lim) {
+      if (zone.children.length >= lim) {
         const last = zone.children[zone.children.length-1];
         document.getElementById('vzone-disponivel').appendChild(last);
       }
@@ -367,6 +368,29 @@ function buildShelves() {
     row.appendChild(wrapper); wrap.appendChild(row);
   });
 
+  // Criar área de disponíveis ANTES de adicionar os cards
+  const dispRow = document.createElement('div');
+  dispRow.style.cssText = 'margin-top:14px;';
+  const dispLabel = document.createElement('div');
+  dispLabel.id = 'disp-label';
+  dispLabel.style.cssText = 'font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#c5cce0;margin-bottom:8px;';
+  dispLabel.textContent = `⚽ Jogadores disponíveis (${shuffledPlayers.length} restantes)`;
+  const dispZone = document.createElement('div');
+  dispZone.id = 'vzone-disponivel';
+  dispZone.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;padding:10px;background:#1a2236;border:1px dashed #2e3a55;border-radius:8px;min-height:60px;';
+  dispZone.addEventListener('dragover', e => { e.preventDefault(); dispZone.style.borderColor='#22c55e'; });
+  dispZone.addEventListener('dragleave', () => { dispZone.style.borderColor='#2e3a55'; });
+  dispZone.addEventListener('drop', e => {
+    e.preventDefault(); dispZone.style.borderColor='#2e3a55';
+    if (!draggingId) return;
+    const card = document.querySelector(`[data-pid="${draggingId}"]`);
+    if (card) { dispZone.appendChild(card); updateCounts(); }
+  });
+  dispRow.appendChild(dispLabel);
+  dispRow.appendChild(dispZone);
+  wrap.appendChild(dispRow);
+
+  // Agora adiciona os cards na área de disponíveis (que já existe no DOM)
   const chao = document.getElementById('vzone-disponivel');
   shuffledPlayers.forEach(p => {
     const card = document.createElement('div');
